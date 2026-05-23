@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="ack" class="actions" th:id="'actions-' + ${feedItemId}">
+    <span th:switch="${action.name()}">
+        <span th:case="'SAVE'">Saved &check;</span>
+        <span th:case="'CLICK'">Marked read &check;</span>
+        <span th:case="'HIDE'">Hidden</span>
+        <span th:case="'VIEW'">Viewed</span>
+        <span th:case="*">Done</span>
+    </span>
+</div>
+</body>
+</html>
