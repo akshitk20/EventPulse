@@ -2,10 +2,12 @@ package com.eventpulse.web;
 
 import com.eventpulse.domain.engagement.EngagementAction;
 import com.eventpulse.domain.feed.FeedItem;
+import com.eventpulse.domain.interest.Interest;
 import com.eventpulse.domain.user.User;
 import com.eventpulse.security.CurrentUserResolver;
 import com.eventpulse.service.EngagementService;
 import com.eventpulse.service.FeedService;
+import com.eventpulse.service.UserInterestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -25,27 +27,49 @@ import java.util.UUID;
 public class FeedController {
 
     private static final int PAGE_SIZE = 20;
+    private static final List<String> SOURCES = List.of("hn", "reddit", "sportsdb");
 
     private final FeedService feedService;
     private final EngagementService engagementService;
+    private final UserInterestService userInterestService;
     private final CurrentUserResolver currentUserResolver;
 
     @GetMapping("/feed")
     public String feed(Authentication authentication,
                        @RequestParam(defaultValue = "0") int page,
+                       @RequestParam(required = false) String q,
+                       @RequestParam(required = false) String source,
+                       @RequestParam(required = false) UUID interest,
                        Model model) {
         User user = currentUserResolver.resolve(authentication)
             .orElseThrow(() -> new IllegalStateException("authenticated principal has no local user row"));
 
-        List<FeedItem> items = feedService.personalizedFeed(
-            user.getId(),
-            PageRequest.of(Math.max(page, 0), PAGE_SIZE)
-        );
+        boolean filtered = (q != null && !q.isBlank())
+                        || (source != null && !source.isBlank())
+                        || interest != null;
+
+        List<FeedItem> items = filtered
+            ? feedService.searchPersonalizedFeed(
+                user.getId(), q, source, interest,
+                PageRequest.of(Math.max(page, 0), PAGE_SIZE))
+            : feedService.personalizedFeed(
+                user.getId(),
+                PageRequest.of(Math.max(page, 0), PAGE_SIZE));
+
+        // Subscribed interests for chip rendering. The service materializes
+        // each Interest's fields inside its transaction so display rendering
+        // doesn't trip a LazyInitializationException.
+        List<Interest> subscribed = userInterestService.subscribedInterests(user.getId());
 
         model.addAttribute("user", user);
         model.addAttribute("items", items);
         model.addAttribute("page", page);
         model.addAttribute("hasNext", items.size() == PAGE_SIZE);
+        model.addAttribute("q", q);
+        model.addAttribute("activeSource", source);
+        model.addAttribute("activeInterestId", interest);
+        model.addAttribute("subscribedInterests", subscribed);
+        model.addAttribute("sources", SOURCES);
         return "feed";
     }
 

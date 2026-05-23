@@ -32,6 +32,20 @@ public class UserInterestService {
     }
 
     /**
+     * The user's subscribed Interest entities, materialized inside the transaction so
+     * callers can read displayName / category / etc. without a LazyInitializationException.
+     * Sorted by displayName for stable rendering order.
+     */
+    @Transactional(readOnly = true)
+    public List<Interest> subscribedInterests(UUID userId) {
+        return userInterestRepository.findByUser_Id(userId).stream()
+            .map(UserInterest::getInterest)
+            .peek(i -> { i.getDisplayName(); i.getSlug(); i.getCategory(); })
+            .sorted(java.util.Comparator.comparing(Interest::getDisplayName))
+            .toList();
+    }
+
+    /**
      * Subscribes the user to the given interest AND every descendant in the taxonomy.
      *
      * Why expand downward: the feed query does an exact interest-id match, so subscribing

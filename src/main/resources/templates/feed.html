@@ -7,6 +7,36 @@
 
     <h2 class="page-title">Your feed</h2>
 
+    <form method="get" action="/feed" class="filter-bar">
+        <input type="search" name="q" th:value="${q}"
+               placeholder="Search titles…" autocomplete="off"/>
+        <input type="hidden" name="source" th:value="${activeSource}" th:if="${activeSource}"/>
+        <input type="hidden" name="interest" th:value="${activeInterestId}" th:if="${activeInterestId}"/>
+        <button type="submit">Search</button>
+        <a th:if="${(q != null and !#strings.isEmpty(q)) or activeSource != null or activeInterestId != null}"
+           href="/feed" class="clear">Clear</a>
+    </form>
+
+    <div class="filter-chips">
+        <span class="chip-label">Source:</span>
+        <a th:each="s : ${sources}"
+           th:with="nextSource=${s == activeSource ? null : s}"
+           th:href="@{/feed(q=${q}, source=${nextSource}, interest=${activeInterestId})}"
+           class="chip source-chip"
+           th:classappend="${s == activeSource} ? 'active'"
+           th:text="${s}">hn</a>
+    </div>
+
+    <div class="filter-chips" th:if="${not #lists.isEmpty(subscribedInterests)}">
+        <span class="chip-label">Interest:</span>
+        <a th:each="i : ${subscribedInterests}"
+           th:with="nextInterest=${i.id == activeInterestId ? null : i.id}"
+           th:href="@{/feed(q=${q}, source=${activeSource}, interest=${nextInterest})}"
+           class="chip interest-chip"
+           th:classappend="${i.id == activeInterestId} ? 'active'"
+           th:text="${i.displayName}">Soccer</a>
+    </div>
+
     <p th:if="${#lists.isEmpty(items)}" class="empty">
         No items yet. Subscribe to interests to populate your feed.
     </p>
@@ -46,10 +76,12 @@
     </article>
 
     <nav class="pager" th:if="${page > 0 or hasNext}">
-        <a th:if="${page > 0}" th:href="@{/feed(page=${page - 1})}">&larr; Newer</a>
+        <a th:if="${page > 0}"
+           th:href="@{/feed(page=${page - 1}, q=${q}, source=${activeSource}, interest=${activeInterestId})}">&larr; Newer</a>
         <span th:unless="${page > 0}"></span>
         <span class="spacer"></span>
-        <a th:if="${hasNext}" th:href="@{/feed(page=${page + 1})}">Older &rarr;</a>
+        <a th:if="${hasNext}"
+           th:href="@{/feed(page=${page + 1}, q=${q}, source=${activeSource}, interest=${activeInterestId})}">Older &rarr;</a>
     </nav>
 </div>
 </body>
