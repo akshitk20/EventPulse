@@ -1,6 +1,7 @@
 package com.eventpulse.web;
 
 import com.eventpulse.aggregator.hn.HackerNewsAggregator;
+import com.eventpulse.aggregator.reddit.RedditAggregator;
 import com.eventpulse.aggregator.sportsdb.SportsDbAggregator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +23,7 @@ public class IngestController {
 
     private final HackerNewsAggregator hackerNewsAggregator;
     private final SportsDbAggregator sportsDbAggregator;
+    private final RedditAggregator redditAggregator;
 
     @GetMapping("/hn")
     public Map<String, Object> hn() {
@@ -33,5 +35,11 @@ public class IngestController {
     public Map<String, Object> sportsdb() {
         int upserts = sportsDbAggregator.ingest();
         return Map.of("source", "sportsdb", "upserts", upserts);
+    }
+
+    @GetMapping("/reddit")
+    public Map<String, Object> reddit() {
+        int upserts = redditAggregator.ingest();
+        return Map.of("source", "reddit", "upserts", upserts);
     }
 }
