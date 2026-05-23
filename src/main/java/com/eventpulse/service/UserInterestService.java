@@ -52,19 +52,9 @@ public class UserInterestService {
             .orElseThrow(() -> new IllegalArgumentException("interest not found: " + interestId));
 
         UserInterest savedRoot = upsertOne(user, root, weight);
-
-        Set<UUID> visited = new HashSet<>();
-        visited.add(root.getId());
-        Deque<Interest> queue = new ArrayDeque<>();
-        queue.add(root);
-        while (!queue.isEmpty()) {
-            Interest current = queue.removeFirst();
-            for (Interest child : interestRepository.findByParent_Id(current.getId())) {
-                if (visited.add(child.getId())) {
-                    upsertOne(user, child, weight);
-                    queue.add(child);
-                }
-            }
+        for (UUID descendantId : collectDescendantIds(root.getId())) {
+            Interest descendant = interestRepository.getReferenceById(descendantId);
+            upsertOne(user, descendant, weight);
         }
         return savedRoot;
     }
@@ -82,12 +72,39 @@ public class UserInterestService {
     }
 
     /**
-     * Removes only the exact (user, interest) row. We deliberately do NOT cascade to
-     * descendants — the user may have subscribed to children individually and would
-     * lose those if we auto-removed them along with a parent unsubscribe.
+     * Removes the row for the requested interest and every descendant in the taxonomy,
+     * mirroring the expansion in {@link #subscribe}. Without the cascade, unsubscribing
+     * "Football" would leave premier-league / la-liga still subscribed (added at
+     * subscribe time) and EPL items would keep showing up in the feed.
      */
     @Transactional
     public void unsubscribe(UUID userId, UUID interestId) {
         userInterestRepository.deleteByUser_IdAndInterest_Id(userId, interestId);
+        for (UUID descendantId : collectDescendantIds(interestId)) {
+            userInterestRepository.deleteByUser_IdAndInterest_Id(userId, descendantId);
+        }
+    }
+
+    /**
+     * BFS-walk the interest tree rooted at the given id and return the ids of every
+     * descendant (not including the root itself). The taxonomy is small enough that
+     * a per-node findByParent_Id query per BFS step is fine.
+     */
+    private Set<UUID> collectDescendantIds(UUID rootId) {
+        Set<UUID> visited = new HashSet<>();
+        Set<UUID> result = new HashSet<>();
+        visited.add(rootId);
+        Deque<UUID> queue = new ArrayDeque<>();
+        queue.add(rootId);
+        while (!queue.isEmpty()) {
+            UUID current = queue.removeFirst();
+            for (Interest child : interestRepository.findByParent_Id(current)) {
+                if (visited.add(child.getId())) {
+                    result.add(child.getId());
+                    queue.add(child.getId());
+                }
+            }
+        }
+        return result;
     }
 }
