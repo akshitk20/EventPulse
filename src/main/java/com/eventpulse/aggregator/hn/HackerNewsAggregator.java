@@ -2,7 +2,7 @@ package com.eventpulse.aggregator.hn;
 
 import com.eventpulse.domain.feed.FeedItem;
 import com.eventpulse.domain.interest.Interest;
-import com.eventpulse.domain.social.TopicAlias;
+import com.eventpulse.repository.InterestRepository;
 import com.eventpulse.repository.TopicAliasRepository;
 import com.eventpulse.service.FeedService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Pulls HN top stories on a schedule, matches each title against the keyword
@@ -42,6 +43,7 @@ public class HackerNewsAggregator {
 
     private final HackerNewsClient client;
     private final TopicAliasRepository topicAliasRepository;
+    private final InterestRepository interestRepository;
     private final FeedService feedService;
 
     /**
@@ -52,9 +54,8 @@ public class HackerNewsAggregator {
         ingest();
     }
 
-    @Transactional
     public int ingest() {
-        Map<String, List<Interest>> aliasIndex = buildAliasIndex();
+        Map<String, List<UUID>> aliasIndex = loadAliasIndex();
         if (aliasIndex.isEmpty()) {
             log.info("HN ingest skipped: no topic aliases registered for source={}", SOURCE);
             return 0;
@@ -68,25 +69,10 @@ public class HackerNewsAggregator {
             HackerNewsItem item = client.item(id);
             if (item == null || !item.isLiveStory()) continue;
 
-            Set<Interest> matched = classify(item.title(), aliasIndex);
-            if (matched.isEmpty()) continue;
+            Set<UUID> matchedIds = classify(item.title(), aliasIndex);
+            if (matchedIds.isEmpty()) continue;
 
-            FeedItem candidate = FeedItem.builder()
-                .source(SOURCE)
-                .sourceId(String.valueOf(item.id()))
-                .url(item.permalinkUrl())
-                .title(item.title())
-                .publishedAt(item.time() == null ? null
-                    : OffsetDateTime.ofInstant(Instant.ofEpochSecond(item.time()), ZoneOffset.UTC))
-                .interests(new HashSet<>(matched))
-                .metadata(new HashMap<>(Map.of("by", item.by() == null ? "" : item.by())))
-                .build();
-
-            feedService.upsertBySource(candidate, existing -> {
-                existing.setTitle(item.title());
-                existing.setUrl(item.permalinkUrl());
-                existing.getInterests().addAll(matched);
-            });
+            ingestOne(item, matchedIds);
             upserts++;
         }
         log.info("HN ingest complete: scanned {} stories, upserted {}", ids.size(), upserts);
@@ -94,29 +80,54 @@ public class HackerNewsAggregator {
     }
 
     /**
-     * Build keyword -> interests map once per ingest. Multiple interests can share
-     * a keyword (e.g. "world cup" -> cricket-wc and football-wc), so values are lists.
+     * Per-item transaction: resolves matched interest IDs to managed entities and either
+     * upserts a new FeedItem or updates an existing one. Kept narrow so a poison item
+     * fails just one tx instead of aborting the whole poll.
      */
-    private Map<String, List<Interest>> buildAliasIndex() {
-        List<TopicAlias> aliases = topicAliasRepository.findAll().stream()
+    @Transactional
+    public void ingestOne(HackerNewsItem item, Set<UUID> matchedIds) {
+        Set<Interest> matched = new HashSet<>();
+        for (UUID iid : matchedIds) matched.add(interestRepository.getReferenceById(iid));
+
+        FeedItem candidate = FeedItem.builder()
+            .source(SOURCE)
+            .sourceId(String.valueOf(item.id()))
+            .url(item.permalinkUrl())
+            .title(item.title())
+            .publishedAt(item.time() == null ? null
+                : OffsetDateTime.ofInstant(Instant.ofEpochSecond(item.time()), ZoneOffset.UTC))
+            .interests(new HashSet<>(matched))
+            .metadata(new HashMap<>(Map.of("by", item.by() == null ? "" : item.by())))
+            .build();
+
+        feedService.upsertBySource(candidate, existing -> {
+            existing.setTitle(item.title());
+            existing.setUrl(item.permalinkUrl());
+            existing.getInterests().addAll(matched);
+        });
+    }
+
+    /**
+     * Load aliases once per ingest, projecting to interest IDs only. Avoids holding
+     * lazy Interest proxies across transaction boundaries — the proxies get resolved
+     * later inside ingestOne()'s transaction via getReferenceById.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, List<UUID>> loadAliasIndex() {
+        Map<String, List<UUID>> index = new HashMap<>();
+        topicAliasRepository.findAll().stream()
             .filter(a -> SOURCE.equals(a.getId().getSource()))
-            .toList();
-        Map<String, List<Interest>> index = new HashMap<>();
-        for (TopicAlias a : aliases) {
-            index.computeIfAbsent(a.getId().getQuery().toLowerCase(Locale.ROOT), k -> new ArrayList<>())
-                 .add(a.getInterest());
-        }
+            .forEach(a -> index
+                .computeIfAbsent(a.getId().getQuery().toLowerCase(Locale.ROOT), k -> new ArrayList<>())
+                .add(a.getId().getInterestId()));
         return index;
     }
 
-    private Set<Interest> classify(String title, Map<String, List<Interest>> aliasIndex) {
+    private Set<UUID> classify(String title, Map<String, List<UUID>> aliasIndex) {
         String haystack = " " + title.toLowerCase(Locale.ROOT) + " ";
-        Set<Interest> hits = new HashSet<>();
-        for (Map.Entry<String, List<Interest>> e : aliasIndex.entrySet()) {
-            String needle = e.getKey();
-            if (containsWord(haystack, needle)) {
-                hits.addAll(e.getValue());
-            }
+        Set<UUID> hits = new HashSet<>();
+        for (Map.Entry<String, List<UUID>> e : aliasIndex.entrySet()) {
+            if (containsWord(haystack, e.getKey())) hits.addAll(e.getValue());
         }
         return hits;
     }
