@@ -21,6 +21,7 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
     @Query("""
         select distinct fi from FeedItem fi
         join fi.interests i
+        left join fetch fi.relatedEvent
         join UserInterest ui on ui.interest = i
         where ui.user.id = :userId
           and not exists (
@@ -34,7 +35,28 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
     List<FeedItem> findPersonalizedFeed(@Param("userId") UUID userId, Pageable pageable);
 
     /**
-     * Items related to a specific event (for the event detail page).
+     * Items the user has SAVE-engaged, newest-saved first.
      */
-    List<FeedItem> findByRelatedEvent_IdOrderByPublishedAtDesc(UUID eventId, Pageable pageable);
+    @Query("""
+        select fi from FeedItem fi
+        left join fetch fi.relatedEvent
+        join UserEngagement ue on ue.feedItem = fi
+        where ue.user.id = :userId
+          and ue.id.action = com.eventpulse.domain.engagement.EngagementAction.SAVE
+        order by ue.createdAt desc
+    """)
+    List<FeedItem> findSavedByUser(@Param("userId") UUID userId, Pageable pageable);
+
+    /**
+     * Items the user has HIDE-engaged, newest-hidden first.
+     */
+    @Query("""
+        select fi from FeedItem fi
+        left join fetch fi.relatedEvent
+        join UserEngagement ue on ue.feedItem = fi
+        where ue.user.id = :userId
+          and ue.id.action = com.eventpulse.domain.engagement.EngagementAction.HIDE
+        order by ue.createdAt desc
+    """)
+    List<FeedItem> findHiddenByUser(@Param("userId") UUID userId, Pageable pageable);
 }

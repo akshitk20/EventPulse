@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Shared head: CSRF meta, htmx, the design-token stylesheet, and the recordClick
+  helper used by "Open original" anchors on list and detail pages.
+  Pages include via: <head th:replace="~{fragments/layout :: head(pageTitle='...')}"></head>
+-->
+<div th:fragment="head(pageTitle)" th:remove="tag">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="${pageTitle} + ' · EventPulse'">EventPulse</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <script>
+        document.addEventListener('htmx:configRequest', (e) => {
+            const tokenMeta = document.querySelector('meta[name="_csrf"]');
+            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
+            if (tokenMeta && headerMeta) {
+                e.detail.headers[headerMeta.content] = tokenMeta.content;
+            }
+        });
+        // Fire-and-forget CLICK ping for anchors that must keep their default navigation.
+        function recordClick(itemId) {
+            const tokenMeta = document.querySelector('meta[name="_csrf"]');
+            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
+            const headers = {};
+            if (tokenMeta && headerMeta) headers[headerMeta.content] = tokenMeta.content;
+            fetch('/engagements/CLICK/' + itemId, { method: 'POST', headers, keepalive: true });
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #fbfaf7;
+            --surface: #ffffff;
+            --text: #1a1a1a;
+            --muted: #6b6b6b;
+            --border: #e5e1da;
+            --border-strong: #d6d1c7;
+            --accent: #1d4ed8;
+            --accent-hover: #1e40af;
+            --serif: 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+            --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrap { max-width: 720px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+
+        .topbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: .75rem 0 1.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.75rem;
+        }
+        .wordmark {
+            font-family: var(--serif);
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .wordmark:hover { color: var(--accent); }
+        .nav { display: flex; gap: .25rem; align-items: center; }
+        .nav a {
+            display: inline-block;
+            padding: .35rem .7rem;
+            border-radius: 999px;
+            text-decoration: none;
+            color: var(--muted);
+            font-size: .88rem;
+            transition: background .12s, color .12s;
+        }
+        .nav a:hover { color: var(--text); background: rgba(0,0,0,.04); }
+        .nav a.active { color: var(--text); background: rgba(0,0,0,.06); font-weight: 500; }
+        .nav form { display: inline; margin: 0; }
+        .nav .signout {
+            background: none; border: none; color: var(--muted);
+            font-size: .88rem; padding: .35rem .7rem; border-radius: 999px;
+            cursor: pointer; font-family: inherit;
+        }
+        .nav .signout:hover { color: var(--text); background: rgba(0,0,0,.04); }
+
+        .page-title {
+            font-family: var(--serif);
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin: 0 0 1.25rem;
+            letter-spacing: -0.01em;
+        }
+
+        .item {
+            position: relative;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.1rem 1.25rem;
+            margin-bottom: .85rem;
+            transition: border-color .12s, box-shadow .12s;
+        }
+        .item:hover { border-color: var(--border-strong); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+        .item .card-link { position: absolute; inset: 0; z-index: 1; border-radius: 12px; }
+        .item h2, .item .meta, .item .actions { position: relative; z-index: 2; pointer-events: none; }
+        .item h2 a, .item .meta a, .item .actions button, .item .actions a { pointer-events: auto; }
+        .item h2 {
+            font-family: var(--serif);
+            margin: 0 0 .35rem;
+            font-size: 1.15rem;
+            font-weight: 600;
+            line-height: 1.35;
+            letter-spacing: -0.005em;
+        }
+        .item h2 a { color: var(--text); text-decoration: none; }
+        .item h2 a:hover { color: var(--accent); }
+
+        .meta {
+            color: var(--muted);
+            font-size: .82rem;
+            display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+        }
+        .meta .dot { color: #c0bcb3; }
+        .meta time { color: var(--muted); }
+
+        .source-pill {
+            display: inline-block;
+            padding: .1rem .55rem;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            color: white;
+            background: #888;
+        }
+        .source-pill.hn { background: #ff6600; }
+        .source-pill.reddit { background: #ff4500; }
+        .source-pill.sportsdb { background: #2e8b57; }
+
+        .interest-tag {
+            display: inline-block;
+            padding: .08rem .45rem;
+            border-radius: 4px;
+            background: #f1ede5;
+            color: #5a554a;
+            font-size: .72rem;
+        }
+
+        .actions {
+            margin-top: .85rem;
+            display: flex; gap: .4rem; align-items: center;
+        }
+        .actions button, .actions a.button {
+            font-family: inherit;
+            font-size: .82rem;
+            padding: .3rem .75rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .12s, border-color .12s, color .12s;
+        }
+        .actions button:hover, .actions a.button:hover {
+            background: #f5f2ec; border-color: var(--border-strong);
+        }
+        .actions a.button.primary {
+            background: var(--accent); border-color: var(--accent); color: white;
+        }
+        .actions a.button.primary:hover {
+            background: var(--accent-hover); border-color: var(--accent-hover);
+        }
+
+        .pager {
+            display: flex; justify-content: space-between; gap: 1rem;
+            margin-top: 1.5rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .pager a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: .9rem;
+        }
+        .pager a:hover { color: var(--accent); }
+        .pager .spacer { flex: 1; }
+
+        .empty {
+            color: var(--muted);
+            font-style: italic;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .filter-bar { display: flex; gap: .5rem; margin-bottom: .85rem; align-items: center; }
+        .filter-bar input[type=search] {
+            flex: 1;
+            padding: .5rem .85rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--surface);
+            font: inherit;
+            color: var(--text);
+        }
+        .filter-bar input[type=search]:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: -1px;
+        }
+        .filter-bar button {
+            padding: .5rem 1rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font: inherit;
+        }
+        .filter-bar button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+        .filter-bar .clear {
+            color: var(--muted);
+            font-size: .85rem;
+            text-decoration: none;
+        }
+        .filter-bar .clear:hover { color: var(--accent); }
+
+        .filter-chips {
+            display: flex; flex-wrap: wrap; gap: .35rem; align-items: center;
+            margin-bottom: .6rem;
+        }
+        .filter-chips .chip-label {
+            color: var(--muted);
+            font-size: .8rem;
+            margin-right: .25rem;
+        }
+        .chip {
+            display: inline-block;
+            padding: .2rem .65rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            text-decoration: none;
+            font-size: .8rem;
+            transition: background .12s, border-color .12s, color .12s;
+        }
+        .chip:hover { border-color: var(--border-strong); background: #f5f2ec; }
+        .chip.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .chip.active:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        .chip.source-chip { text-transform: lowercase; }
+
+        .hidden-notice {
+            background: #f5f2ec;
+            color: var(--muted);
+            font-size: .88rem;
+            padding: .75rem 1rem;
+        }
+
+        .back-link {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: .88rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        .back-link:hover { color: var(--accent); }
+        .detail h1 {
+            font-family: var(--serif);
+            font-size: 1.85rem;
+            font-weight: 600;
+            line-height: 1.25;
+            margin: .25rem 0 .75rem;
+            letter-spacing: -0.01em;
+        }
+        .detail .meta { margin-bottom: 1.25rem; }
+        .detail-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.1rem 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .detail-section h3 {
+            font-family: var(--sans);
+            margin: 0 0 .75rem;
+            font-size: .8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            font-weight: 600;
+        }
+        .detail-section dl {
+            margin: 0;
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: .35rem 1rem;
+        }
+        .detail-section dt { color: var(--muted); font-size: .88rem; }
+        .detail-section dd { margin: 0; font-size: .9rem; }
+        .detail-section dd a { color: var(--accent); text-decoration: none; }
+        .detail-section dd a:hover { text-decoration: underline; }
+        .scoreline {
+            display: flex; align-items: center; gap: 1rem;
+            margin-top: .9rem; padding-top: .9rem;
+            border-top: 1px solid var(--border);
+        }
+        .scoreline .team { flex: 1; font-weight: 600; font-family: var(--serif); }
+        .scoreline .team.away { text-align: right; }
+        .scoreline .score { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .scoreline .vs { color: var(--muted); font-size: .85rem; }
+    </style>
+</div>
+
+<!--
+  Top header: wordmark + nav. Pass the active page slug so the right link gets highlighted.
+  Usage: <header th:replace="~{fragments/layout :: topbar(active='feed')}"></header>
+-->
+<header th:fragment="topbar(active)" class="topbar">
+    <a href="/feed" class="wordmark">EventPulse</a>
+    <nav class="nav">
+        <a href="/feed" th:classappend="${active == 'feed'} ? 'active'">Feed</a>
+        <a href="/feed/saved" th:classappend="${active == 'saved'} ? 'active'">Saved</a>
+        <a href="/feed/hidden" th:classappend="${active == 'hidden'} ? 'active'">Hidden</a>
+        <a href="/interests" th:classappend="${active == 'interests'} ? 'active'">Interests</a>
+        <form th:action="@{/logout}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="signout">Sign out</button>
+        </form>
+    </nav>
+</header>
+
+</body>
+</html>

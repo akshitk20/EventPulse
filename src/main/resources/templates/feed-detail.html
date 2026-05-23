@@ -1,72 +1,32 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8"/>
-    <title th:text="${item.title} + ' · EventPulse'">Detail · EventPulse</title>
-    <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
-    <meta name="_csrf" th:content="${_csrf.token}"/>
-    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-    <script>
-        document.addEventListener('htmx:configRequest', (e) => {
-            const tokenMeta = document.querySelector('meta[name="_csrf"]');
-            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
-            if (tokenMeta && headerMeta) {
-                e.detail.headers[headerMeta.content] = tokenMeta.content;
-            }
-        });
-    </script>
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        header a { text-decoration: none; }
-        h1 { margin: .5rem 0; line-height: 1.25; }
-        .meta { color: #666; font-size: .9rem; margin-bottom: 1rem; }
-        .meta .interests { margin-left: .25rem; }
-        .meta .interests span { background: #f1f1f1; padding: .1rem .4rem; border-radius: 4px; margin-right: .25rem; font-size: .8rem; }
-        .open-original { display: inline-block; margin: .5rem 0 1rem; padding: .4rem .9rem; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; }
-        .open-original:hover { background: #1d4ed8; }
-        section { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-        section h3 { margin: 0 0 .5rem; font-size: 1rem; color: #444; }
-        dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: .25rem .75rem; }
-        dt { color: #666; }
-        dd { margin: 0; }
-        .event-card .row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-        .event-card .row .team { flex: 1; font-weight: 600; }
-        .event-card .row .score { font-size: 1.5rem; font-weight: 700; }
-        .actions { display: flex; gap: .5rem; margin-top: 1rem; }
-        .actions button { font-size: .9rem; padding: .35rem .8rem; cursor: pointer; }
-    </style>
-</head>
+<head th:replace="~{fragments/layout :: head(pageTitle=${item.title})}"></head>
 <body>
-    <header>
-        <a href="/feed">&larr; Back to feed</a>
-        <form th:action="@{/logout}" method="post" style="display:inline">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <button type="submit">Sign out</button>
-        </form>
-    </header>
+<div class="wrap detail">
+    <header th:replace="~{fragments/layout :: topbar(active='feed')}"></header>
+
+    <a href="/feed" class="back-link">&larr; Back to feed</a>
 
     <article>
         <h1 th:text="${item.title}">Title</h1>
 
         <div class="meta">
-            <span th:text="${item.source}">source</span>
-            <span th:if="${item.publishedAt}"> &middot;
-                <time th:datetime="${item.publishedAt}"
-                      th:text="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}">date</time>
-            </span>
-            <span th:if="${not #sets.isEmpty(item.interests)}" class="interests"> &middot;
-                <span th:each="i : ${item.interests}" th:text="${i.slug}">slug</span>
-            </span>
+            <span class="source-pill"
+                  th:classappend="${item.source}"
+                  th:text="${item.source}">source</span>
+            <span th:if="${item.publishedAt}" class="dot">&middot;</span>
+            <time th:if="${item.publishedAt}"
+                  th:datetime="${item.publishedAt}"
+                  th:title="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}"
+                  th:text="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}">date</time>
+            <th:block th:if="${not #sets.isEmpty(item.interests)}">
+                <span class="dot">&middot;</span>
+                <span th:each="i : ${item.interests}" class="interest-tag" th:text="${i.slug}">slug</span>
+            </th:block>
         </div>
 
-        <a class="open-original"
-           th:href="${item.url}" target="_blank" rel="noopener"
-           th:hx-post="@{'/engagements/CLICK/' + ${item.id}}"
-           hx-swap="none">Open original &rarr;</a>
-
         <!-- Source-specific metadata block -->
-        <section th:switch="${item.source}">
+        <section class="detail-section" th:switch="${item.source}">
 
             <div th:case="'hn'">
                 <h3>Hacker News</h3>
@@ -115,42 +75,28 @@
                     <dd th:if="${item.metadata.containsKey('status')}"
                         th:text="${item.metadata['status']}">status</dd>
                 </dl>
-                <div class="row" style="margin-top:.75rem"
+                <div class="scoreline"
                      th:if="${item.metadata.containsKey('homeTeam') and item.metadata.containsKey('awayTeam')}">
-                    <span class="team" th:text="${item.metadata['homeTeam']}">Home</span>
+                    <span class="team home" th:text="${item.metadata['homeTeam']}">Home</span>
                     <span class="score" th:if="${item.metadata.containsKey('homeScore')}"
                           th:text="${item.metadata['homeScore']}">0</span>
-                    <span style="color:#888">vs</span>
+                    <span class="vs">vs</span>
                     <span class="score" th:if="${item.metadata.containsKey('awayScore')}"
                           th:text="${item.metadata['awayScore']}">0</span>
-                    <span class="team" style="text-align:right"
-                          th:text="${item.metadata['awayTeam']}">Away</span>
+                    <span class="team away" th:text="${item.metadata['awayTeam']}">Away</span>
                 </div>
             </div>
 
             <div th:case="*">
                 <h3 th:text="${item.source}">source</h3>
-                <p style="color:#888;margin:0">No source-specific details.</p>
+                <p style="color:var(--muted);margin:0">No source-specific details.</p>
             </div>
-        </section>
-
-        <!-- Related event card -->
-        <section class="event-card" th:if="${item.relatedEvent != null}">
-            <h3>Related event</h3>
-            <p style="margin:.25rem 0;font-weight:600" th:text="${item.relatedEvent.title}">Event title</p>
-            <dl>
-                <dt th:if="${item.relatedEvent.category}">Category</dt>
-                <dd th:if="${item.relatedEvent.category}" th:text="${item.relatedEvent.category}">category</dd>
-                <dt th:if="${item.relatedEvent.startsAt}">Starts</dt>
-                <dd th:if="${item.relatedEvent.startsAt}"
-                    th:text="${#temporals.format(item.relatedEvent.startsAt, 'yyyy-MM-dd HH:mm')}">date</dd>
-                <dt th:if="${item.relatedEvent.status}">Status</dt>
-                <dd th:if="${item.relatedEvent.status}" th:text="${item.relatedEvent.status}">status</dd>
-            </dl>
         </section>
 
         <!-- Engagement actions -->
         <div class="actions" th:id="'actions-' + ${item.id}">
+            <a class="button primary" th:href="${item.url}" target="_blank" rel="noopener"
+               th:attr="onclick=|recordClick('${item.id}');|">Open original</a>
             <button th:hx-post="@{'/engagements/SAVE/' + ${item.id}}"
                     th:hx-target="'#actions-' + ${item.id}"
                     hx-swap="outerHTML">Save</button>
@@ -159,5 +105,6 @@
                     hx-swap="outerHTML">Hide</button>
         </div>
     </article>
+</div>
 </body>
 </html>

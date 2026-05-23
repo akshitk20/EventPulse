@@ -1,49 +1,70 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8"/>
-    <title>Interests &middot; EventPulse</title>
-    <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
-    <meta name="_csrf" th:content="${_csrf.token}"/>
-    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-    <script>
-        document.addEventListener('htmx:configRequest', (e) => {
-            const tokenMeta = document.querySelector('meta[name="_csrf"]');
-            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
-            if (tokenMeta && headerMeta) {
-                e.detail.headers[headerMeta.content] = tokenMeta.content;
-            }
-        });
-    </script>
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
-        header { display: flex; justify-content: space-between; align-items: baseline; }
-        nav a { margin-right: 1rem; }
-        h2 { margin-top: 2rem; font-size: 1.1rem; color: #444; }
-        .root { margin-top: 1rem; padding: .75rem; border: 1px solid #eee; border-radius: 6px; }
-        .root-name { font-weight: 600; }
-        .children { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; padding-left: 1rem; }
-        .toggle button { font-size: .85rem; padding: .25rem .6rem; cursor: pointer; border: 1px solid #aaa;
-                         background: #fff; border-radius: 4px; }
-        .toggle button.on { background: #2c7; color: #fff; border-color: #2c7; }
-    </style>
-</head>
+<head th:replace="~{fragments/layout :: head(pageTitle='Interests')}"></head>
 <body>
-    <header>
-        <h1>Interests</h1>
-        <nav>
-            <a href="/feed">Feed</a>
-            <form th:action="@{/logout}" method="post" style="display:inline">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <button type="submit">Sign out</button>
-            </form>
-        </nav>
-    </header>
+<div class="wrap">
+    <header th:replace="~{fragments/layout :: topbar(active='interests')}"></header>
 
-    <p>Pick what you want to follow. The feed is built from these.</p>
+    <h2 class="page-title">Interests</h2>
+    <p style="color:var(--muted); margin-top:-.75rem; margin-bottom:1.5rem;">
+        Pick what you want to follow. Your feed is built from these.
+    </p>
+
+    <style>
+        .category-title {
+            font-family: var(--serif);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 1.75rem 0 .75rem;
+            color: var(--text);
+        }
+        .category-title:first-of-type { margin-top: 0; }
+        .root {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: .85rem;
+        }
+        .root-name { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .root-name > span:first-child {
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        .children {
+            display: flex; flex-wrap: wrap; gap: .4rem;
+            margin-top: .85rem;
+            padding-top: .85rem;
+            border-top: 1px solid var(--border);
+        }
+        .toggle button {
+            font-family: inherit;
+            font-size: .82rem;
+            padding: .3rem .75rem;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            border-radius: 999px;
+            transition: background .12s, border-color .12s, color .12s;
+        }
+        .toggle button:hover {
+            background: #f5f2ec;
+            border-color: var(--border-strong);
+        }
+        .toggle button.on {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .toggle button.on:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+    </style>
 
     <th:block th:each="entry : ${rootsByCategory}">
-        <h2 th:text="${entry.key}">CATEGORY</h2>
+        <h3 class="category-title" th:text="${entry.key}">CATEGORY</h3>
         <div th:each="root : ${entry.value}" class="root">
             <div class="root-name">
                 <span th:text="${root.displayName}">Sports</span>
@@ -64,5 +85,6 @@
             </div>
         </div>
     </th:block>
+</div>
 </body>
 </html>

@@ -50,6 +50,52 @@ public class FeedController {
     }
 
     /**
+     * Saved view — items the user has SAVE-engaged, newest-saved first.
+     * Uses the same card layout as /feed but pulls from the saved query.
+     */
+    @GetMapping("/feed/saved")
+    public String saved(Authentication authentication,
+                        @RequestParam(defaultValue = "0") int page,
+                        Model model) {
+        User user = currentUserResolver.resolve(authentication)
+            .orElseThrow(() -> new IllegalStateException("authenticated principal has no local user row"));
+
+        List<FeedItem> items = feedService.savedFeed(
+            user.getId(),
+            PageRequest.of(Math.max(page, 0), PAGE_SIZE)
+        );
+
+        model.addAttribute("user", user);
+        model.addAttribute("items", items);
+        model.addAttribute("page", page);
+        model.addAttribute("hasNext", items.size() == PAGE_SIZE);
+        return "feed-saved";
+    }
+
+    /**
+     * Hidden view — items the user has HIDE-engaged. Lets users review what
+     * they've hidden and undo. Without this page, Hide is a black hole.
+     */
+    @GetMapping("/feed/hidden")
+    public String hidden(Authentication authentication,
+                         @RequestParam(defaultValue = "0") int page,
+                         Model model) {
+        User user = currentUserResolver.resolve(authentication)
+            .orElseThrow(() -> new IllegalStateException("authenticated principal has no local user row"));
+
+        List<FeedItem> items = feedService.hiddenFeed(
+            user.getId(),
+            PageRequest.of(Math.max(page, 0), PAGE_SIZE)
+        );
+
+        model.addAttribute("user", user);
+        model.addAttribute("items", items);
+        model.addAttribute("page", page);
+        model.addAttribute("hasNext", items.size() == PAGE_SIZE);
+        return "feed-hidden";
+    }
+
+    /**
      * Per-item detail view. Records a CLICK engagement on open — composite PK on
      * UserEngagement keeps re-visits idempotent. Branches on item.source for
      * source-specific metadata in the template.

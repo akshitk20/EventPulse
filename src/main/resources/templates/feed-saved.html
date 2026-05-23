@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head(pageTitle='Feed')}"></head>
+<head th:replace="~{fragments/layout :: head(pageTitle='Saved')}"></head>
 <body>
 <div class="wrap">
-    <header th:replace="~{fragments/layout :: topbar(active='feed')}"></header>
+    <header th:replace="~{fragments/layout :: topbar(active='saved')}"></header>
 
-    <h2 class="page-title">Your feed</h2>
+    <h2 class="page-title">Saved</h2>
 
     <p th:if="${#lists.isEmpty(items)}" class="empty">
-        No items yet. Subscribe to interests to populate your feed.
+        Nothing saved yet. Click <strong>Save</strong> on any feed card to keep it here.
     </p>
 
     <article th:each="item : ${items}" class="item" th:id="'item-' + ${item.id}">
@@ -25,19 +25,11 @@
                   th:datetime="${item.publishedAt}"
                   th:title="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}"
                   th:text="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}">date</time>
-            <th:block th:if="${not #sets.isEmpty(item.interests)}">
-                <span class="dot">&middot;</span>
-                <span th:each="i : ${item.interests}" class="interest-tag" th:text="${i.slug}">slug</span>
-            </th:block>
         </div>
 
         <div class="actions" th:id="'actions-' + ${item.id}">
             <a class="button" th:href="${item.url}" target="_blank" rel="noopener"
                th:attr="onclick=|event.stopPropagation(); recordClick('${item.id}');|">Open original</a>
-            <button onclick="event.stopPropagation()"
-                    th:hx-post="@{'/engagements/SAVE/' + ${item.id}}"
-                    th:hx-target="'#actions-' + ${item.id}"
-                    hx-swap="outerHTML">Save</button>
             <button onclick="event.stopPropagation()"
                     th:hx-post="@{'/engagements/HIDE/' + ${item.id}}"
                     th:hx-target="'#item-' + ${item.id}"
@@ -46,10 +38,10 @@
     </article>
 
     <nav class="pager" th:if="${page > 0 or hasNext}">
-        <a th:if="${page > 0}" th:href="@{/feed(page=${page - 1})}">&larr; Newer</a>
+        <a th:if="${page > 0}" th:href="@{/feed/saved(page=${page - 1})}">&larr; Newer</a>
         <span th:unless="${page > 0}"></span>
         <span class="spacer"></span>
-        <a th:if="${hasNext}" th:href="@{/feed(page=${page + 1})}">Older &rarr;</a>
+        <a th:if="${hasNext}" th:href="@{/feed/saved(page=${page + 1})}">Older &rarr;</a>
     </nav>
 </div>
 </body>

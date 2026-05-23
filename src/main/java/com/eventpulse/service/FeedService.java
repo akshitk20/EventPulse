@@ -21,12 +21,23 @@ public class FeedService {
 
     @Transactional(readOnly = true)
     public List<FeedItem> personalizedFeed(UUID userId, Pageable pageable) {
-        return feedItemRepository.findPersonalizedFeed(userId, pageable);
+        List<FeedItem> items = feedItemRepository.findPersonalizedFeed(userId, pageable);
+        items.forEach(i -> Hibernate.initialize(i.getInterests()));
+        return items;
     }
 
     @Transactional(readOnly = true)
-    public List<FeedItem> forEvent(UUID eventId, Pageable pageable) {
-        return feedItemRepository.findByRelatedEvent_IdOrderByPublishedAtDesc(eventId, pageable);
+    public List<FeedItem> savedFeed(UUID userId, Pageable pageable) {
+        List<FeedItem> items = feedItemRepository.findSavedByUser(userId, pageable);
+        items.forEach(i -> Hibernate.initialize(i.getInterests()));
+        return items;
+    }
+
+    @Transactional(readOnly = true)
+    public List<FeedItem> hiddenFeed(UUID userId, Pageable pageable) {
+        List<FeedItem> items = feedItemRepository.findHiddenByUser(userId, pageable);
+        items.forEach(i -> Hibernate.initialize(i.getInterests()));
+        return items;
     }
 
     @Transactional(readOnly = true)
