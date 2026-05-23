@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Feed &middot; EventPulse</title>
+</head>
+<body>
+    <h1>Your feed</h1>
+    <p>Personalized items will appear here.</p>
+    <form th:action="@{/logout}" method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <button type="submit">Sign out</button>
+    </form>
+</body>
+</html>
