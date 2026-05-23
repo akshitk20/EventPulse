@@ -1,5 +1,7 @@
-package com.eventpulse.domain.interest;
+package com.eventpulse.repository;
 
+import com.eventpulse.domain.interest.Interest;
+import com.eventpulse.domain.interest.InterestCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

@@ -1,5 +1,7 @@
-package com.eventpulse.domain.event;
+package com.eventpulse.repository;
 
+import com.eventpulse.domain.event.Event;
+import com.eventpulse.domain.event.EventStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

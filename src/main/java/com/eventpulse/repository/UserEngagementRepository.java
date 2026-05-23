@@ -1,5 +1,7 @@
-package com.eventpulse.domain.engagement;
+package com.eventpulse.repository;
 
+import com.eventpulse.domain.engagement.EngagementAction;
+import com.eventpulse.domain.engagement.UserEngagement;
 import com.eventpulse.domain.engagement.UserEngagement.UserEngagementId;
 import org.springframework.data.jpa.repository.JpaRepository;
 

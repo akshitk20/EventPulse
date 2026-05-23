@@ -1,5 +1,6 @@
-package com.eventpulse.domain.feed;
+package com.eventpulse.repository;
 
+import com.eventpulse.domain.feed.FeedItem;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

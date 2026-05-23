@@ -1,5 +1,6 @@
-package com.eventpulse.domain.social;
+package com.eventpulse.repository;
 
+import com.eventpulse.domain.social.TopicAlias;
 import com.eventpulse.domain.social.TopicAlias.TopicAliasId;
 import org.springframework.data.jpa.repository.JpaRepository;
 

@@ -1,5 +1,6 @@
-package com.eventpulse.domain.user;
+package com.eventpulse.repository;
 
+import com.eventpulse.domain.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
