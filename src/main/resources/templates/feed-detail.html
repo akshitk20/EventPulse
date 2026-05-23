@@ -101,6 +101,7 @@
                     th:hx-target="'#actions-' + ${item.id}"
                     hx-swap="outerHTML">Save</button>
             <button th:hx-post="@{'/engagements/HIDE/' + ${item.id}}"
+                    hx-headers='{"HX-Detail": "1"}'
                     th:hx-target="'#actions-' + ${item.id}"
                     hx-swap="outerHTML">Hide</button>
         </div>

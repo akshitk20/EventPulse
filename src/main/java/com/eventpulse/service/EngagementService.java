@@ -57,4 +57,14 @@ public class EngagementService {
                 .build());
         });
     }
+
+    /**
+     * Remove a specific (user, item, action) engagement. Idempotent — missing row is a no-op.
+     * Used by Undo flows (undo Hide, unsave).
+     */
+    @Transactional
+    public void delete(UUID userId, UUID feedItemId, EngagementAction action) {
+        UserEngagementId pk = new UserEngagementId(userId, feedItemId, action);
+        engagementRepository.deleteById(pk);
+    }
 }

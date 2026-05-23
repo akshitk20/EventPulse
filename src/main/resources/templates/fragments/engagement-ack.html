@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
+
+<!-- Generic ack: SAVE / CLICK / VIEW. Replaces the action bar with a static label. -->
 <div th:fragment="ack" class="actions" th:id="'actions-' + ${feedItemId}">
     <span th:switch="${action.name()}">
         <span th:case="'SAVE'">Saved &check;</span>
@@ -10,5 +12,32 @@
         <span th:case="*">Done</span>
     </span>
 </div>
+
+<!--
+  Hide ack with undo. The whole article element (#item-{id}) is the swap target
+  so the card collapses to a single inline notice. Clicking Undo restores the
+  Hide button via /engagements/HIDE/{id}/undo.
+-->
+<article th:fragment="hide-undo" class="item hidden-notice" th:id="'item-' + ${feedItemId}">
+    <span style="color:#888">Hidden.</span>
+    <button th:hx-post="@{'/engagements/HIDE/' + ${feedItemId} + '/undo'}"
+            th:hx-target="'#item-' + ${feedItemId}"
+            hx-swap="outerHTML"
+            style="margin-left:.5rem">Undo</button>
+</article>
+
+<!--
+  Returned by the undo endpoint. After an undo we don't know which page the user
+  was on, so we restore a minimal action bar with just the Hide control. The
+  card body itself (title + meta) is still in the DOM only if the swap target
+  was the action bar; if the target was the whole card, the card is gone — in
+  which case the user can navigate back to /feed to re-engage.
+-->
+<div th:fragment="actions" class="actions" th:id="'actions-' + ${feedItemId}">
+    <button th:hx-post="@{'/engagements/HIDE/' + ${feedItemId}}"
+            th:hx-target="'#item-' + ${feedItemId}"
+            hx-swap="outerHTML">Hide</button>
+</div>
+
 </body>
 </html>
