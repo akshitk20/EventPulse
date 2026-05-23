@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<span th:fragment="toggle(interestId, subscribed, displayName)"
+      class="toggle" th:id="'toggle-' + ${interestId}">
+    <button th:if="${subscribed}"
+            class="on"
+            th:hx-post="@{'/interests/' + ${interestId} + '/unsubscribe'}"
+            th:hx-target="'#toggle-' + ${interestId}"
+            hx-swap="outerHTML">
+        <span th:text="${displayName}">Name</span> &check;
+    </button>
+    <button th:unless="${subscribed}"
+            th:hx-post="@{'/interests/' + ${interestId} + '/subscribe'}"
+            th:hx-target="'#toggle-' + ${interestId}"
+            hx-swap="outerHTML">
+        <span th:text="${displayName}">Name</span> +
+    </button>
+</span>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Interests &middot; EventPulse</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <script>
+        document.addEventListener('htmx:configRequest', (e) => {
+            const tokenMeta = document.querySelector('meta[name="_csrf"]');
+            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
+            if (tokenMeta && headerMeta) {
+                e.detail.headers[headerMeta.content] = tokenMeta.content;
+            }
+        });
+    </script>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        header { display: flex; justify-content: space-between; align-items: baseline; }
+        nav a { margin-right: 1rem; }
+        h2 { margin-top: 2rem; font-size: 1.1rem; color: #444; }
+        .root { margin-top: 1rem; padding: .75rem; border: 1px solid #eee; border-radius: 6px; }
+        .root-name { font-weight: 600; }
+        .children { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; padding-left: 1rem; }
+        .toggle button { font-size: .85rem; padding: .25rem .6rem; cursor: pointer; border: 1px solid #aaa;
+                         background: #fff; border-radius: 4px; }
+        .toggle button.on { background: #2c7; color: #fff; border-color: #2c7; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Interests</h1>
+        <nav>
+            <a href="/feed">Feed</a>
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit">Sign out</button>
+            </form>
+        </nav>
+    </header>
+
+    <p>Pick what you want to follow. The feed is built from these.</p>
+
+    <th:block th:each="entry : ${rootsByCategory}">
+        <h2 th:text="${entry.key}">CATEGORY</h2>
+        <div th:each="root : ${entry.value}" class="root">
+            <div class="root-name">
+                <span th:text="${root.displayName}">Sports</span>
+                <span class="toggle" th:replace="~{fragments/interest-toggle :: toggle(
+                    interestId=${root.id},
+                    subscribed=${subscribedIds.contains(root.id)},
+                    displayName=${root.displayName}
+                )}"></span>
+            </div>
+            <div class="children" th:if="${childrenByParent.containsKey(root.id)}">
+                <th:block th:each="child : ${childrenByParent.get(root.id)}">
+                    <span class="toggle" th:replace="~{fragments/interest-toggle :: toggle(
+                        interestId=${child.id},
+                        subscribed=${subscribedIds.contains(child.id)},
+                        displayName=${child.displayName}
+                    )}"></span>
+                </th:block>
+            </div>
+        </div>
+    </th:block>
+</body>
+</html>
