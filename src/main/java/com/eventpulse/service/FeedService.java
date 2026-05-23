@@ -3,6 +3,7 @@ package com.eventpulse.service;
 import com.eventpulse.domain.feed.FeedItem;
 import com.eventpulse.repository.FeedItemRepository;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +31,14 @@ public class FeedService {
 
     @Transactional(readOnly = true)
     public Optional<FeedItem> findById(UUID id) {
-        return feedItemRepository.findById(id);
+        return feedItemRepository.findById(id)
+            .map(item -> {
+                Hibernate.initialize(item.getInterests());
+                if (item.getRelatedEvent() != null) {
+                    Hibernate.initialize(item.getRelatedEvent());
+                }
+                return item;
+            });
     }
 
     /**

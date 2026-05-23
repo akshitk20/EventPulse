@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Not found · EventPulse</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 540px; margin: 4rem auto; padding: 0 1rem; text-align: center; }
+        h1 { font-size: 3rem; margin: 0 0 .5rem; color: #1d4ed8; }
+        p { color: #555; }
+        a { color: #1d4ed8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .message { color: #888; font-size: .9rem; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>404</h1>
+    <p>That feed item couldn't be found. It may have been removed, or the link is wrong.</p>
+    <p class="message" th:if="${message}" th:text="${message}">message</p>
+    <p><a href="/feed">&larr; Back to feed</a></p>
+</body>
+</html>

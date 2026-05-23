@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${item.title} + ' · EventPulse'">Detail · EventPulse</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <script>
+        document.addEventListener('htmx:configRequest', (e) => {
+            const tokenMeta = document.querySelector('meta[name="_csrf"]');
+            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
+            if (tokenMeta && headerMeta) {
+                e.detail.headers[headerMeta.content] = tokenMeta.content;
+            }
+        });
+    </script>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        header a { text-decoration: none; }
+        h1 { margin: .5rem 0; line-height: 1.25; }
+        .meta { color: #666; font-size: .9rem; margin-bottom: 1rem; }
+        .meta .interests { margin-left: .25rem; }
+        .meta .interests span { background: #f1f1f1; padding: .1rem .4rem; border-radius: 4px; margin-right: .25rem; font-size: .8rem; }
+        .open-original { display: inline-block; margin: .5rem 0 1rem; padding: .4rem .9rem; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; }
+        .open-original:hover { background: #1d4ed8; }
+        section { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        section h3 { margin: 0 0 .5rem; font-size: 1rem; color: #444; }
+        dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: .25rem .75rem; }
+        dt { color: #666; }
+        dd { margin: 0; }
+        .event-card .row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .event-card .row .team { flex: 1; font-weight: 600; }
+        .event-card .row .score { font-size: 1.5rem; font-weight: 700; }
+        .actions { display: flex; gap: .5rem; margin-top: 1rem; }
+        .actions button { font-size: .9rem; padding: .35rem .8rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/feed">&larr; Back to feed</a>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit">Sign out</button>
+        </form>
+    </header>
+
+    <article>
+        <h1 th:text="${item.title}">Title</h1>
+
+        <div class="meta">
+            <span th:text="${item.source}">source</span>
+            <span th:if="${item.publishedAt}"> &middot;
+                <time th:datetime="${item.publishedAt}"
+                      th:text="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}">date</time>
+            </span>
+            <span th:if="${not #sets.isEmpty(item.interests)}" class="interests"> &middot;
+                <span th:each="i : ${item.interests}" th:text="${i.slug}">slug</span>
+            </span>
+        </div>
+
+        <a class="open-original"
+           th:href="${item.url}" target="_blank" rel="noopener"
+           th:hx-post="@{'/engagements/CLICK/' + ${item.id}}"
+           hx-swap="none">Open original &rarr;</a>
+
+        <!-- Source-specific metadata block -->
+        <section th:switch="${item.source}">
+
+            <div th:case="'hn'">
+                <h3>Hacker News</h3>
+                <dl>
+                    <dt th:if="${item.metadata.containsKey('by') and !#strings.isEmpty(item.metadata['by'])}">Author</dt>
+                    <dd th:if="${item.metadata.containsKey('by') and !#strings.isEmpty(item.metadata['by'])}"
+                        th:text="${item.metadata['by']}">by</dd>
+                </dl>
+            </div>
+
+            <div th:case="'reddit'">
+                <h3>Reddit</h3>
+                <dl>
+                    <dt th:if="${item.metadata.containsKey('subreddit')}">Subreddit</dt>
+                    <dd th:if="${item.metadata.containsKey('subreddit')}">
+                        <a th:href="'https://www.reddit.com/r/' + ${item.metadata['subreddit']}"
+                           target="_blank" rel="noopener"
+                           th:text="'r/' + ${item.metadata['subreddit']}">r/sub</a>
+                    </dd>
+                    <dt th:if="${item.metadata.containsKey('author')}">Author</dt>
+                    <dd th:if="${item.metadata.containsKey('author')}"
+                        th:text="${'u/' + item.metadata['author']}">u/author</dd>
+                    <dt th:if="${item.metadata.containsKey('score')}">Score</dt>
+                    <dd th:if="${item.metadata.containsKey('score')}"
+                        th:text="${item.metadata['score']}">score</dd>
+                    <dt th:if="${item.metadata.containsKey('comments')}">Comments</dt>
+                    <dd th:if="${item.metadata.containsKey('comments')}"
+                        th:text="${item.metadata['comments']}">comments</dd>
+                    <dt th:if="${item.metadata.containsKey('permalink')}">Discussion</dt>
+                    <dd th:if="${item.metadata.containsKey('permalink')}">
+                        <a th:href="${item.metadata['permalink']}" target="_blank" rel="noopener">View on Reddit</a>
+                    </dd>
+                </dl>
+            </div>
+
+            <div th:case="'sportsdb'">
+                <h3>Match details</h3>
+                <dl>
+                    <dt th:if="${item.metadata.containsKey('league')}">League</dt>
+                    <dd th:if="${item.metadata.containsKey('league')}"
+                        th:text="${item.metadata['league']}">league</dd>
+                    <dt th:if="${item.metadata.containsKey('sport')}">Sport</dt>
+                    <dd th:if="${item.metadata.containsKey('sport')}"
+                        th:text="${item.metadata['sport']}">sport</dd>
+                    <dt th:if="${item.metadata.containsKey('status')}">Status</dt>
+                    <dd th:if="${item.metadata.containsKey('status')}"
+                        th:text="${item.metadata['status']}">status</dd>
+                </dl>
+                <div class="row" style="margin-top:.75rem"
+                     th:if="${item.metadata.containsKey('homeTeam') and item.metadata.containsKey('awayTeam')}">
+                    <span class="team" th:text="${item.metadata['homeTeam']}">Home</span>
+                    <span class="score" th:if="${item.metadata.containsKey('homeScore')}"
+                          th:text="${item.metadata['homeScore']}">0</span>
+                    <span style="color:#888">vs</span>
+                    <span class="score" th:if="${item.metadata.containsKey('awayScore')}"
+                          th:text="${item.metadata['awayScore']}">0</span>
+                    <span class="team" style="text-align:right"
+                          th:text="${item.metadata['awayTeam']}">Away</span>
+                </div>
+            </div>
+
+            <div th:case="*">
+                <h3 th:text="${item.source}">source</h3>
+                <p style="color:#888;margin:0">No source-specific details.</p>
+            </div>
+        </section>
+
+        <!-- Related event card -->
+        <section class="event-card" th:if="${item.relatedEvent != null}">
+            <h3>Related event</h3>
+            <p style="margin:.25rem 0;font-weight:600" th:text="${item.relatedEvent.title}">Event title</p>
+            <dl>
+                <dt th:if="${item.relatedEvent.category}">Category</dt>
+                <dd th:if="${item.relatedEvent.category}" th:text="${item.relatedEvent.category}">category</dd>
+                <dt th:if="${item.relatedEvent.startsAt}">Starts</dt>
+                <dd th:if="${item.relatedEvent.startsAt}"
+                    th:text="${#temporals.format(item.relatedEvent.startsAt, 'yyyy-MM-dd HH:mm')}">date</dd>
+                <dt th:if="${item.relatedEvent.status}">Status</dt>
+                <dd th:if="${item.relatedEvent.status}" th:text="${item.relatedEvent.status}">status</dd>
+            </dl>
+        </section>
+
+        <!-- Engagement actions -->
+        <div class="actions" th:id="'actions-' + ${item.id}">
+            <button th:hx-post="@{'/engagements/SAVE/' + ${item.id}}"
+                    th:hx-target="'#actions-' + ${item.id}"
+                    hx-swap="outerHTML">Save</button>
+            <button th:hx-post="@{'/engagements/HIDE/' + ${item.id}}"
+                    th:hx-target="'#actions-' + ${item.id}"
+                    hx-swap="outerHTML">Hide</button>
+        </div>
+    </article>
+</body>
+</html>

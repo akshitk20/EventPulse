@@ -18,11 +18,18 @@
     <style>
         body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
         header { display: flex; justify-content: space-between; align-items: center; }
-        .item { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        .item { position: relative; border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; transition: box-shadow .12s; }
+        .item:hover { box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+        .item .card-link { position: absolute; inset: 0; z-index: 1; border-radius: 8px; }
+        .item h2, .item .meta, .item .actions { position: relative; z-index: 2; pointer-events: none; }
+        .item h2 a, .item .actions button, .item .actions a { pointer-events: auto; }
         .item h2 { margin: 0 0 .25rem; font-size: 1.1rem; }
+        .item h2 a { color: #1d4ed8; text-decoration: none; }
+        .item h2 a:hover { text-decoration: underline; }
         .meta { color: #666; font-size: .85rem; }
-        .actions { margin-top: .75rem; display: flex; gap: .5rem; }
-        .actions button { font-size: .85rem; padding: .25rem .6rem; cursor: pointer; }
+        .actions { margin-top: .75rem; display: flex; gap: .5rem; align-items: center; }
+        .actions button, .actions a.button { font-size: .85rem; padding: .25rem .6rem; cursor: pointer; border: 1px solid #ccc; background: #f7f7f7; border-radius: 4px; color: #333; text-decoration: none; }
+        .actions button:hover, .actions a.button:hover { background: #eee; }
         .empty { color: #888; font-style: italic; }
     </style>
 </head>
@@ -43,8 +50,9 @@
     </p>
 
     <article th:each="item : ${items}" class="item" th:id="'item-' + ${item.id}">
+        <a class="card-link" th:href="@{'/feed/' + ${item.id}}" th:aria-label="${item.title}"></a>
         <h2>
-            <a th:href="${item.url}" th:text="${item.title}" target="_blank" rel="noopener">title</a>
+            <a th:href="@{'/feed/' + ${item.id}}" th:text="${item.title}">title</a>
         </h2>
         <div class="meta">
             <span th:text="${item.source}">source</span>
@@ -58,15 +66,18 @@
         </div>
 
         <div class="actions" th:id="'actions-' + ${item.id}">
-            <button th:hx-post="@{'/engagements/SAVE/' + ${item.id}}"
+            <a class="button" th:href="${item.url}" target="_blank" rel="noopener"
+               onclick="event.stopPropagation()"
+               th:hx-post="@{'/engagements/CLICK/' + ${item.id}}"
+               hx-swap="none">Open original &rarr;</a>
+            <button onclick="event.stopPropagation()"
+                    th:hx-post="@{'/engagements/SAVE/' + ${item.id}}"
                     th:hx-target="'#actions-' + ${item.id}"
                     hx-swap="outerHTML">Save</button>
-            <button th:hx-post="@{'/engagements/HIDE/' + ${item.id}}"
+            <button onclick="event.stopPropagation()"
+                    th:hx-post="@{'/engagements/HIDE/' + ${item.id}}"
                     th:hx-target="'#item-' + ${item.id}"
                     hx-swap="delete">Hide</button>
-            <button th:hx-post="@{'/engagements/CLICK/' + ${item.id}}"
-                    th:hx-target="'#actions-' + ${item.id}"
-                    hx-swap="outerHTML">Mark read</button>
         </div>
     </article>
 
