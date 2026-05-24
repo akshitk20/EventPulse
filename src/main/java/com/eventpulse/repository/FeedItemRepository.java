@@ -15,22 +15,47 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
     Optional<FeedItem> findBySourceAndSourceId(String source, String sourceId);
 
     /**
-     * Personalized feed: items tagged with any of the user's interests, newest first.
+     * Personalized feed: items tagged with any of the user's interests.
      * Hides items the user has explicitly hidden.
+     *
+     * Ordering blends a per-source feedback weight derived from the user's
+     * own engagement history (SAVE = +2, CLICK = +0.5, HIDE = -3) with
+     * recency. A user who saves lots of HN sees HN rise; a user who hides
+     * lots of YouTube sees it sink. New users with no engagements get the
+     * weight as 0 from {@code coalesce}, which collapses to chronological.
+     *
+     * The weight is computed via a correlated scalar subquery in ORDER BY.
+     * {@code user_engagement} is bounded by user activity (not feed size),
+     * and the {@code (user_id, ...)} index makes this cheap per row.
      */
     @Query("""
-        select distinct fi from FeedItem fi
-        join fi.interests i
+        select fi from FeedItem fi
         left join fetch fi.relatedEvent
-        join UserInterest ui on ui.interest = i
-        where ui.user.id = :userId
+        where exists (
+            select 1 from UserInterest ui
+            join ui.interest i
+            where ui.user.id = :userId
+              and i member of fi.interests
+          )
           and not exists (
             select 1 from UserEngagement ue
             where ue.user.id = :userId
               and ue.feedItem.id = fi.id
               and ue.id.action = com.eventpulse.domain.engagement.EngagementAction.HIDE
           )
-        order by fi.publishedAt desc nulls last, fi.fetchedAt desc
+        order by coalesce((
+            select sum(case ue2.id.action
+                when com.eventpulse.domain.engagement.EngagementAction.SAVE then 2.0
+                when com.eventpulse.domain.engagement.EngagementAction.CLICK then 0.5
+                when com.eventpulse.domain.engagement.EngagementAction.HIDE then -3.0
+                else 0.0
+            end)
+            from UserEngagement ue2
+            where ue2.user.id = :userId
+              and ue2.feedItem.source = fi.source
+        ), 0.0) desc,
+        fi.publishedAt desc nulls last,
+        fi.fetchedAt desc
     """)
     List<FeedItem> findPersonalizedFeed(@Param("userId") UUID userId, Pageable pageable);
 
@@ -38,22 +63,42 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * Personalized feed filtered by source and/or interest, but no text query.
      * The {@code :source = ''} sentinel keeps the bind text-typed (a null String
      * binds as bytea on Postgres and breaks downstream comparisons).
+     *
+     * Same source-level weight ordering as {@link #findPersonalizedFeed}. When the
+     * user filters to a single source, the weight collapses to a constant for all
+     * rows and recency takes over — that's fine, it's already what the user asked
+     * for by narrowing the source.
      */
     @Query("""
-        select distinct fi from FeedItem fi
-        join fi.interests i
+        select fi from FeedItem fi
         left join fetch fi.relatedEvent
-        join UserInterest ui on ui.interest = i
-        where ui.user.id = :userId
+        where exists (
+            select 1 from UserInterest ui
+            join ui.interest i
+            where ui.user.id = :userId
+              and i member of fi.interests
+              and (:interestId is null or i.id = :interestId)
+          )
           and (:source = '' or fi.source = :source)
-          and (:interestId is null or i.id = :interestId)
           and not exists (
             select 1 from UserEngagement ue
             where ue.user.id = :userId
               and ue.feedItem.id = fi.id
               and ue.id.action = com.eventpulse.domain.engagement.EngagementAction.HIDE
           )
-        order by fi.publishedAt desc nulls last, fi.fetchedAt desc
+        order by coalesce((
+            select sum(case ue2.id.action
+                when com.eventpulse.domain.engagement.EngagementAction.SAVE then 2.0
+                when com.eventpulse.domain.engagement.EngagementAction.CLICK then 0.5
+                when com.eventpulse.domain.engagement.EngagementAction.HIDE then -3.0
+                else 0.0
+            end)
+            from UserEngagement ue2
+            where ue2.user.id = :userId
+              and ue2.feedItem.source = fi.source
+        ), 0.0) desc,
+        fi.publishedAt desc nulls last,
+        fi.fetchedAt desc
     """)
     List<FeedItem> filterPersonalizedFeed(
         @Param("userId") UUID userId,
