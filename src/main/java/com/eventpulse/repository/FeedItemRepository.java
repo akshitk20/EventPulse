@@ -41,6 +41,16 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * doesn't get diluted by yesterday's news. New users with no history (and no
      * trending activity) get 0+0+0 from coalesce, collapsing to recency.
      *
+     * Implemented via three {@code WITH ... AS MATERIALIZED} CTEs that each
+     * aggregate user_engagement once per request:
+     * {@code source_w} (per-source weight for this user), {@code interest_w}
+     * (per-interest weight for this user), and {@code trending} (per-item
+     * 24h global weight). The outer ORDER BY does cheap lookups against these
+     * pre-aggregated tables instead of re-running correlated subqueries per
+     * row. {@code MATERIALIZED} is required: without it Postgres 12+ inlines
+     * CTEs and the planner re-evaluates them per outer row, which on a 10k
+     * feed_items dataset took ~13 seconds for Q1. With MATERIALIZED, ~150 ms.
+     *
      * Native query because the per-interest avg needs a derived-table subquery,
      * which JPQL doesn't support in scalar position. {@code feed_item_interests}
      * is unmapped on the entity but referenced directly by the inner subquery.
@@ -50,6 +60,47 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * the feed list view doesn't render relatedEvent fields, so this is fine.
      */
     @Query(value = """
+        with
+        source_w as materialized (
+            select fi2.source as source,
+                   sum(case ue2.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue2
+            join feed_items fi2 on fi2.id = ue2.feed_item_id
+            where ue2.user_id = :userId
+              and ue2.created_at > now() - interval '30 days'
+            group by fi2.source
+        ),
+        interest_w as materialized (
+            select fii.interest_id as interest_id,
+                   sum(case ue3.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue3
+            join feed_item_interests fii on fii.feed_item_id = ue3.feed_item_id
+            where ue3.user_id = :userId
+              and ue3.created_at > now() - interval '30 days'
+            group by fii.interest_id
+        ),
+        trending as materialized (
+            select ue4.feed_item_id as feed_item_id,
+                   sum(case ue4.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue4
+            where ue4.created_at > now() - interval '24 hours'
+            group by ue4.feed_item_id
+        )
         select fi.* from feed_items fi
         where exists (
             select 1 from feed_item_interests fii
@@ -64,51 +115,16 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
               and ue.action = 'hide'
           )
         order by (
-            coalesce((
-                select sum(case ue2.action
-                    when 'save'  then 2.0
-                    when 'click' then 0.5
-                    when 'hide'  then -3.0
-                    else 0.0
-                end)
-                from user_engagement ue2
-                join feed_items fi2 on fi2.id = ue2.feed_item_id
-                where ue2.user_id = :userId
-                  and fi2.source = fi.source
-                  and ue2.created_at > now() - interval '30 days'
-            ), 0.0)
+            coalesce((select w from source_w where source = fi.source), 0.0)
             +
             coalesce((
-                select avg(per_interest_w) from (
-                    select coalesce(sum(case ue3.action
-                        when 'save'  then 2.0
-                        when 'click' then 0.5
-                        when 'hide'  then -3.0
-                        else 0.0
-                    end), 0.0) as per_interest_w
-                    from feed_item_interests fii_cur
-                    left join feed_item_interests fii_other
-                        on fii_other.interest_id = fii_cur.interest_id
-                    left join user_engagement ue3
-                        on ue3.feed_item_id = fii_other.feed_item_id
-                        and ue3.user_id = :userId
-                        and ue3.created_at > now() - interval '30 days'
-                    where fii_cur.feed_item_id = fi.id
-                    group by fii_cur.interest_id
-                ) per_interest
+                select avg(coalesce(iw.w, 0.0))
+                from feed_item_interests fii_cur
+                left join interest_w iw on iw.interest_id = fii_cur.interest_id
+                where fii_cur.feed_item_id = fi.id
             ), 0.0)
             +
-            coalesce((
-                select sum(case ue4.action
-                    when 'save'  then 2.0
-                    when 'click' then 0.5
-                    when 'hide'  then -3.0
-                    else 0.0
-                end)
-                from user_engagement ue4
-                where ue4.feed_item_id = fi.id
-                  and ue4.created_at > now() - interval '24 hours'
-            ), 0.0)
+            coalesce((select w from trending where feed_item_id = fi.id), 0.0)
         ) desc,
         fi.published_at desc nulls last,
         fi.fetched_at desc
@@ -132,6 +148,47 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * data type of parameter".
      */
     @Query(value = """
+        with
+        source_w as materialized (
+            select fi2.source as source,
+                   sum(case ue2.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue2
+            join feed_items fi2 on fi2.id = ue2.feed_item_id
+            where ue2.user_id = :userId
+              and ue2.created_at > now() - interval '30 days'
+            group by fi2.source
+        ),
+        interest_w as materialized (
+            select fii.interest_id as interest_id,
+                   sum(case ue3.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue3
+            join feed_item_interests fii on fii.feed_item_id = ue3.feed_item_id
+            where ue3.user_id = :userId
+              and ue3.created_at > now() - interval '30 days'
+            group by fii.interest_id
+        ),
+        trending as materialized (
+            select ue4.feed_item_id as feed_item_id,
+                   sum(case ue4.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue4
+            where ue4.created_at > now() - interval '24 hours'
+            group by ue4.feed_item_id
+        )
         select fi.* from feed_items fi
         where exists (
             select 1 from feed_item_interests fii
@@ -148,51 +205,16 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
               and ue.action = 'hide'
           )
         order by (
-            coalesce((
-                select sum(case ue2.action
-                    when 'save'  then 2.0
-                    when 'click' then 0.5
-                    when 'hide'  then -3.0
-                    else 0.0
-                end)
-                from user_engagement ue2
-                join feed_items fi2 on fi2.id = ue2.feed_item_id
-                where ue2.user_id = :userId
-                  and fi2.source = fi.source
-                  and ue2.created_at > now() - interval '30 days'
-            ), 0.0)
+            coalesce((select w from source_w where source = fi.source), 0.0)
             +
             coalesce((
-                select avg(per_interest_w) from (
-                    select coalesce(sum(case ue3.action
-                        when 'save'  then 2.0
-                        when 'click' then 0.5
-                        when 'hide'  then -3.0
-                        else 0.0
-                    end), 0.0) as per_interest_w
-                    from feed_item_interests fii_cur
-                    left join feed_item_interests fii_other
-                        on fii_other.interest_id = fii_cur.interest_id
-                    left join user_engagement ue3
-                        on ue3.feed_item_id = fii_other.feed_item_id
-                        and ue3.user_id = :userId
-                        and ue3.created_at > now() - interval '30 days'
-                    where fii_cur.feed_item_id = fi.id
-                    group by fii_cur.interest_id
-                ) per_interest
+                select avg(coalesce(iw.w, 0.0))
+                from feed_item_interests fii_cur
+                left join interest_w iw on iw.interest_id = fii_cur.interest_id
+                where fii_cur.feed_item_id = fi.id
             ), 0.0)
             +
-            coalesce((
-                select sum(case ue4.action
-                    when 'save'  then 2.0
-                    when 'click' then 0.5
-                    when 'hide'  then -3.0
-                    else 0.0
-                end)
-                from user_engagement ue4
-                where ue4.feed_item_id = fi.id
-                  and ue4.created_at > now() - interval '24 hours'
-            ), 0.0)
+            coalesce((select w from trending where feed_item_id = fi.id), 0.0)
         ) desc,
         fi.published_at desc nulls last,
         fi.fetched_at desc
@@ -223,6 +245,47 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * the feed list view doesn't render relatedEvent fields, so this is fine.
      */
     @Query(value = """
+        with
+        source_w as materialized (
+            select fi2.source as source,
+                   sum(case ue2.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue2
+            join feed_items fi2 on fi2.id = ue2.feed_item_id
+            where ue2.user_id = :userId
+              and ue2.created_at > now() - interval '30 days'
+            group by fi2.source
+        ),
+        interest_w as materialized (
+            select fii.interest_id as interest_id,
+                   sum(case ue3.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue3
+            join feed_item_interests fii on fii.feed_item_id = ue3.feed_item_id
+            where ue3.user_id = :userId
+              and ue3.created_at > now() - interval '30 days'
+            group by fii.interest_id
+        ),
+        trending as materialized (
+            select ue4.feed_item_id as feed_item_id,
+                   sum(case ue4.action
+                       when 'save'  then 2.0
+                       when 'click' then 0.5
+                       when 'hide'  then -3.0
+                       else 0.0
+                   end) as w
+            from user_engagement ue4
+            where ue4.created_at > now() - interval '24 hours'
+            group by ue4.feed_item_id
+        )
         select fi.* from feed_items fi
         where fi.search_vector @@ plainto_tsquery('english', :q)
           and (:source = '' or fi.source = :source)
@@ -241,51 +304,16 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
           )
         order by ts_rank_cd(fi.search_vector, plainto_tsquery('english', :q)) desc,
                  (
-                    coalesce((
-                        select sum(case ue2.action
-                            when 'save'  then 2.0
-                            when 'click' then 0.5
-                            when 'hide'  then -3.0
-                            else 0.0
-                        end)
-                        from user_engagement ue2
-                        join feed_items fi2 on fi2.id = ue2.feed_item_id
-                        where ue2.user_id = :userId
-                          and fi2.source = fi.source
-                          and ue2.created_at > now() - interval '30 days'
-                    ), 0.0)
+                    coalesce((select w from source_w where source = fi.source), 0.0)
                     +
                     coalesce((
-                        select avg(per_interest_w) from (
-                            select coalesce(sum(case ue3.action
-                                when 'save'  then 2.0
-                                when 'click' then 0.5
-                                when 'hide'  then -3.0
-                                else 0.0
-                            end), 0.0) as per_interest_w
-                            from feed_item_interests fii_cur
-                            left join feed_item_interests fii_other
-                                on fii_other.interest_id = fii_cur.interest_id
-                            left join user_engagement ue3
-                                on ue3.feed_item_id = fii_other.feed_item_id
-                                and ue3.user_id = :userId
-                                and ue3.created_at > now() - interval '30 days'
-                            where fii_cur.feed_item_id = fi.id
-                            group by fii_cur.interest_id
-                        ) per_interest
+                        select avg(coalesce(iw.w, 0.0))
+                        from feed_item_interests fii_cur
+                        left join interest_w iw on iw.interest_id = fii_cur.interest_id
+                        where fii_cur.feed_item_id = fi.id
                     ), 0.0)
                     +
-                    coalesce((
-                        select sum(case ue4.action
-                            when 'save'  then 2.0
-                            when 'click' then 0.5
-                            when 'hide'  then -3.0
-                            else 0.0
-                        end)
-                        from user_engagement ue4
-                        where ue4.feed_item_id = fi.id
-                          and ue4.created_at > now() - interval '24 hours'
-                    ), 0.0)
+                    coalesce((select w from trending where feed_item_id = fi.id), 0.0)
                  ) desc,
                  fi.published_at desc nulls last,
                  fi.fetched_at desc
