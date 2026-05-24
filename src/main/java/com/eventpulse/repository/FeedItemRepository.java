@@ -74,13 +74,16 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * the feed list view doesn't render relatedEvent fields, so this is fine.
      */
     @Query(value = """
-        select distinct fi.* from feed_items fi
-        join feed_item_interests fii on fii.feed_item_id = fi.id
-        join user_interests ui on ui.interest_id = fii.interest_id
-        where ui.user_id = :userId
-          and fi.search_vector @@ plainto_tsquery('english', :q)
+        select fi.* from feed_items fi
+        where fi.search_vector @@ plainto_tsquery('english', :q)
           and (:source = '' or fi.source = :source)
-          and (cast(:interestId as uuid) is null or fii.interest_id = :interestId)
+          and exists (
+            select 1 from feed_item_interests fii
+            join user_interests ui on ui.interest_id = fii.interest_id
+            where fii.feed_item_id = fi.id
+              and ui.user_id = :userId
+              and (cast(:interestId as uuid) is null or fii.interest_id = :interestId)
+          )
           and not exists (
             select 1 from user_engagement ue
             where ue.user_id = :userId
