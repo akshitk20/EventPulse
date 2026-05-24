@@ -18,7 +18,7 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * Personalized feed: items tagged with any of the user's interests.
      * Hides items the user has explicitly hidden.
      *
-     * Ordering blends two engagement-derived weights with recency:
+     * Ordering blends three engagement-derived weights with recency:
      *
      *   1. <b>Source weight</b> — sum over the user's last 30 days of engagements
      *      on items sharing this item's source (SAVE=+2, CLICK=+0.5, HIDE=-3).
@@ -31,11 +31,15 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      *      so a music-only HIDE penalises music-tagged items but doesn't poison
      *      gaming-tagged items that share a source.
      *
-     * Both subqueries apply a 30-day hard cutoff so old preferences don't
-     * permanently shadow current behaviour. The {@code (user_id, created_at DESC)}
-     * index makes the cutoff cheap.
+     *   3. <b>Trending</b> — sum over <i>all users'</i> last 24h engagements on
+     *      this exact item. Same SAVE/CLICK/HIDE weights. This gives cold-start
+     *      users (whose source/interest weights are both 0) a meaningful
+     *      ranking signal, and surfaces what's globally hot for active users.
+     *      Served by the V8 (feed_item_id, created_at) index.
      *
-     * New users with no engagements get 0+0 from coalesce, collapsing to recency.
+     * Source/interest cutoffs are 30 days; trending is 24 hours so "hot now"
+     * doesn't get diluted by yesterday's news. New users with no history (and no
+     * trending activity) get 0+0+0 from coalesce, collapsing to recency.
      *
      * Native query because the per-interest avg needs a derived-table subquery,
      * which JPQL doesn't support in scalar position. {@code feed_item_interests}
@@ -93,6 +97,18 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
                     group by fii_cur.interest_id
                 ) per_interest
             ), 0.0)
+            +
+            coalesce((
+                select sum(case ue4.action
+                    when 'save'  then 2.0
+                    when 'click' then 0.5
+                    when 'hide'  then -3.0
+                    else 0.0
+                end)
+                from user_engagement ue4
+                where ue4.feed_item_id = fi.id
+                  and ue4.created_at > now() - interval '24 hours'
+            ), 0.0)
         ) desc,
         fi.published_at desc nulls last,
         fi.fetched_at desc
@@ -105,10 +121,11 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * The {@code :source = ''} sentinel keeps the bind text-typed (a null String
      * binds as bytea on Postgres and breaks downstream comparisons).
      *
-     * Same source + per-interest weighted ordering as {@link #findPersonalizedFeed}
-     * with a 30-day cutoff. When the user filters to a single source, the source
-     * weight collapses to a constant for all rows and per-interest avg + recency
-     * take over — that's fine, narrowing the source is already what the user asked for.
+     * Same three-axis weighted ordering as {@link #findPersonalizedFeed}
+     * (source + per-interest + trending) with the same 30-day / 24-hour cutoffs.
+     * When the user filters to a single source, the source weight collapses to a
+     * constant for all rows and per-interest avg + trending + recency take over —
+     * that's fine, narrowing the source is already what the user asked for.
      *
      * Cast on {@code :interestId} is needed because Postgres can't infer the type
      * of a null bind in a comparison; without the cast we'd hit "could not determine
@@ -164,6 +181,18 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
                     group by fii_cur.interest_id
                 ) per_interest
             ), 0.0)
+            +
+            coalesce((
+                select sum(case ue4.action
+                    when 'save'  then 2.0
+                    when 'click' then 0.5
+                    when 'hide'  then -3.0
+                    else 0.0
+                end)
+                from user_engagement ue4
+                where ue4.feed_item_id = fi.id
+                  and ue4.created_at > now() - interval '24 hours'
+            ), 0.0)
         ) desc,
         fi.published_at desc nulls last,
         fi.fetched_at desc
@@ -183,10 +212,10 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
      * the {@code @@} operator and {@code ts_rank_cd} aren't in JPQL.
      *
      * Personalization signal applies as a secondary tiebreaker: when relevance is
-     * close, the same source+per-interest weighted score (with 30-day cutoff) used
-     * by the unfiltered feed nudges results toward sources/topics the user engages
-     * with. We don't let it dominate ts_rank_cd — the user typed a query, relevance
-     * leads.
+     * close, the same three-axis weighted score (source + per-interest + trending,
+     * 30-day / 24-hour cutoffs) used by the unfiltered feed nudges results toward
+     * sources/topics the user — and the wider community — engages with. We don't
+     * let it dominate ts_rank_cd: the user typed a query, relevance leads.
      *
      * Hibernate maps result columns by name back to the {@link FeedItem} entity.
      * The {@code search_vector} column is unmapped on the entity and silently
@@ -244,6 +273,18 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, UUID> {
                             where fii_cur.feed_item_id = fi.id
                             group by fii_cur.interest_id
                         ) per_interest
+                    ), 0.0)
+                    +
+                    coalesce((
+                        select sum(case ue4.action
+                            when 'save'  then 2.0
+                            when 'click' then 0.5
+                            when 'hide'  then -3.0
+                            else 0.0
+                        end)
+                        from user_engagement ue4
+                        where ue4.feed_item_id = fi.id
+                          and ue4.created_at > now() - interval '24 hours'
                     ), 0.0)
                  ) desc,
                  fi.published_at desc nulls last,
