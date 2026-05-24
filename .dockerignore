@@ -1,0 +1,15 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+
+# Never ship dev secrets into the image
+src/main/resources/application-dev.yml
+.env
+
+# Markdown isn't needed in the runtime image
+*.md
+!README.md
