@@ -27,7 +27,7 @@ import java.util.UUID;
 public class FeedController {
 
     private static final int PAGE_SIZE = 20;
-    private static final List<String> SOURCES = List.of("hn", "reddit", "sportsdb");
+    private static final List<String> SOURCES = List.of("hn", "reddit", "sportsdb", "youtube");
 
     private final FeedService feedService;
     private final EngagementService engagementService;

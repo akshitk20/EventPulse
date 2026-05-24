@@ -62,6 +62,32 @@
                 </dl>
             </div>
 
+            <div th:case="'youtube'">
+                <h3>YouTube</h3>
+                <dl>
+                    <dt th:if="${item.metadata.containsKey('channelTitle')}">Channel</dt>
+                    <dd th:if="${item.metadata.containsKey('channelTitle')}">
+                        <a th:if="${item.metadata.containsKey('channelHandle')}"
+                           th:href="'https://www.youtube.com/@' + ${item.metadata['channelHandle']}"
+                           target="_blank" rel="noopener"
+                           th:text="${item.metadata['channelTitle']}">channel</a>
+                        <span th:unless="${item.metadata.containsKey('channelHandle')}"
+                              th:text="${item.metadata['channelTitle']}">channel</span>
+                    </dd>
+                    <dt th:if="${item.metadata.containsKey('description') and !#strings.isEmpty(item.metadata['description'])}">Description</dt>
+                    <dd th:if="${item.metadata.containsKey('description') and !#strings.isEmpty(item.metadata['description'])}"
+                        th:text="${item.metadata['description']}">description</dd>
+                </dl>
+                <div class="yt-embed" th:if="${item.metadata.containsKey('channelId')}">
+                    <iframe width="560" height="315"
+                            th:src="'https://www.youtube.com/embed/' + ${item.sourceId}"
+                            title="YouTube video player"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen></iframe>
+                </div>
+            </div>
+
             <div th:case="'sportsdb'">
                 <h3>Match details</h3>
                 <dl>
