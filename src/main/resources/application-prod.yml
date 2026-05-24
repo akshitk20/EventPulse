@@ -27,3 +27,7 @@ spring:
 logging:
   level:
     com.eventpulse: INFO
+
+eventpulse:
+  youtube:
+    api-key: ${YOUTUBE_API_KEY:}
