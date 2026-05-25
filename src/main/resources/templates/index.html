@@ -1,12 +1,319 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
-    <title>EventPulse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>EventPulse · A feed that learns what you care about</title>
+    <meta name="description" content="A personalized feed that pulls from Hacker News, Reddit, TheSportsDB, and YouTube — ranked by what you actually save, click, and hide."/>
+    <style>
+        :root {
+            --bg: #fbfaf7;
+            --surface: #ffffff;
+            --text: #1a1a1a;
+            --muted: #6b6b6b;
+            --subtle: #8a8a8a;
+            --border: #e5e1da;
+            --border-strong: #d6d1c7;
+            --accent: #1d4ed8;
+            --accent-hover: #1e40af;
+            --serif: 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+            --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { color: var(--accent-hover); }
+
+        .topbar {
+            max-width: 960px;
+            margin: 0 auto;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1.1rem 1.5rem;
+        }
+        .wordmark {
+            font-family: var(--serif);
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text);
+        }
+        .topbar .signin {
+            font-size: .9rem;
+            color: var(--muted);
+            padding: .35rem .9rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            transition: border-color .12s, color .12s;
+        }
+        .topbar .signin:hover { color: var(--text); border-color: var(--border-strong); }
+
+        .hero {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 4rem 1.5rem 3rem;
+            text-align: center;
+        }
+        .eyebrow {
+            display: inline-block;
+            font-size: .78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted);
+            background: #f1ede5;
+            padding: .3rem .75rem;
+            border-radius: 999px;
+            margin-bottom: 1.25rem;
+        }
+        .hero h1 {
+            font-family: var(--serif);
+            font-size: 2.85rem;
+            line-height: 1.12;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin: 0 0 1rem;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero .lede {
+            font-size: 1.1rem;
+            color: var(--muted);
+            margin: 0 auto 2rem;
+            max-width: 540px;
+        }
+        .cta {
+            display: inline-flex; align-items: center; gap: .5rem;
+            padding: .8rem 1.5rem;
+            border-radius: 999px;
+            background: var(--accent);
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background .12s, transform .12s;
+        }
+        .cta:hover { background: var(--accent-hover); color: white; transform: translateY(-1px); }
+        .cta-note {
+            display: block;
+            font-size: .82rem;
+            color: var(--subtle);
+            margin-top: .85rem;
+        }
+
+        .sources {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 1.5rem 3rem;
+            display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem;
+        }
+        .source-pill {
+            display: inline-block;
+            padding: .3rem .85rem;
+            border-radius: 999px;
+            font-size: .75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: white;
+        }
+        .source-pill.hn { background: #ff6600; }
+        .source-pill.reddit { background: #ff4500; }
+        .source-pill.sportsdb { background: #2e8b57; }
+        .source-pill.youtube { background: #ff0000; }
+
+        .features {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 1rem 1.5rem 4rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+        .feature {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.4rem 1.4rem 1.5rem;
+            transition: border-color .12s, box-shadow .12s, transform .12s;
+        }
+        .feature:hover {
+            border-color: var(--border-strong);
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+            transform: translateY(-1px);
+        }
+        .feature .icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            background: #eef2ff;
+            color: var(--accent);
+            margin-bottom: .85rem;
+            font-size: 1.1rem;
+        }
+        .feature h3 {
+            font-family: var(--serif);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 .35rem;
+            letter-spacing: -0.005em;
+        }
+        .feature p {
+            margin: 0;
+            font-size: .92rem;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .how {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 1rem 1.5rem 4rem;
+        }
+        .how h2 {
+            font-family: var(--serif);
+            font-size: 1.5rem;
+            font-weight: 600;
+            text-align: center;
+            margin: 0 0 1.75rem;
+            letter-spacing: -0.01em;
+        }
+        .how ol {
+            list-style: none; padding: 0; margin: 0;
+            display: grid; gap: .85rem;
+        }
+        .how li {
+            display: flex; gap: 1rem; align-items: flex-start;
+            padding: 1rem 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .how .step {
+            flex: none;
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .85rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        .how .step-body strong {
+            display: block;
+            font-family: var(--serif);
+            font-size: 1.02rem;
+            font-weight: 600;
+            margin-bottom: .15rem;
+        }
+        .how .step-body span { color: var(--muted); font-size: .92rem; }
+
+        .footer {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 2.5rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--subtle);
+            font-size: .85rem;
+        }
+        .footer a { color: var(--muted); }
+
+        @media (max-width: 540px) {
+            .hero { padding: 2.5rem 1.25rem 2rem; }
+            .hero h1 { font-size: 2.1rem; }
+            .hero .lede { font-size: 1rem; }
+        }
+    </style>
 </head>
 <body>
-    <h1>EventPulse</h1>
-    <p>Event-aware sports + entertainment aggregator.</p>
-    <a href="/login">Sign in</a>
+
+<header class="topbar">
+    <span class="wordmark">EventPulse</span>
+    <a href="/login" class="signin">Sign in</a>
+</header>
+
+<section class="hero">
+    <span class="eyebrow">Personalized feed · No noise</span>
+    <h1>One feed that <span class="accent">learns</span><br/>what you actually read.</h1>
+    <p class="lede">
+        EventPulse pulls from four sources, classifies every item against a
+        fixed taxonomy, and ranks the result using your own saves, clicks,
+        and hides — plus what's trending right now.
+    </p>
+    <a href="/oauth2/authorization/google" class="cta">
+        Continue with Google
+        <span aria-hidden="true">→</span>
+    </a>
+    <span class="cta-note">Free to use · Sign in with Google · No card required</span>
+</section>
+
+<div class="sources" aria-label="Sources">
+    <span class="source-pill hn">Hacker News</span>
+    <span class="source-pill reddit">Reddit</span>
+    <span class="source-pill sportsdb">TheSportsDB</span>
+    <span class="source-pill youtube">YouTube</span>
+</div>
+
+<section class="features">
+    <div class="feature">
+        <span class="icon" aria-hidden="true">★</span>
+        <h3>Tagged, not blended</h3>
+        <p>Every item is matched against a curated taxonomy — Sport, Movies, TV, Music, Gaming. Things that don't fit get dropped, not buried.</p>
+    </div>
+    <div class="feature">
+        <span class="icon" aria-hidden="true">↗</span>
+        <h3>Ranked by you</h3>
+        <p>Save an item and that source rises. Hide one and the topic sinks — for that interest specifically, not your whole feed.</p>
+    </div>
+    <div class="feature">
+        <span class="icon" aria-hidden="true">⚡</span>
+        <h3>Trending blended in</h3>
+        <p>A 24-hour global signal mixes with your history, so day-one users see something meaningful instead of an empty page.</p>
+    </div>
+    <div class="feature">
+        <span class="icon" aria-hidden="true">🔍</span>
+        <h3>Real search</h3>
+        <p>Postgres full-text search with stemming and relevance ranking — "rusty" finds "rust", and the closest match wins, not the newest.</p>
+    </div>
+</section>
+
+<section class="how">
+    <h2>How it works</h2>
+    <ol>
+        <li>
+            <span class="step">1</span>
+            <div class="step-body">
+                <strong>Sign in with Google</strong>
+                <span>One click. No password, no profile setup.</span>
+            </div>
+        </li>
+        <li>
+            <span class="step">2</span>
+            <div class="step-body">
+                <strong>Pick what you care about</strong>
+                <span>Subscribe to interests like Football, Indie Games, or Sci-Fi TV. Change them anytime.</span>
+            </div>
+        </li>
+        <li>
+            <span class="step">3</span>
+            <div class="step-body">
+                <strong>Read, save, hide</strong>
+                <span>Every action shapes the next request — quietly, with no thumbs-up rituals.</span>
+            </div>
+        </li>
+    </ol>
+</section>
+
+<footer class="footer">
+    <p>EventPulse · Built with Spring Boot &amp; PostgreSQL · <a href="/login">Sign in</a></p>
+</footer>
+
 </body>
 </html>
