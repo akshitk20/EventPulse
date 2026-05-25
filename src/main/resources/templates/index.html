@@ -105,6 +105,19 @@
             color: var(--subtle);
             margin-top: .85rem;
         }
+        .cta-secondary {
+            display: inline-block;
+            margin-top: .65rem;
+            font-size: .92rem;
+            color: var(--muted);
+            border-bottom: 1px dotted var(--border-strong);
+            padding-bottom: 1px;
+            transition: color .12s, border-color .12s;
+        }
+        .cta-secondary:hover {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
 
         .sources {
             max-width: 720px;
@@ -252,6 +265,7 @@
         <span aria-hidden="true">→</span>
     </a>
     <span class="cta-note">Free to use · Sign in with Google · No card required</span>
+    <a href="/demo" class="cta-secondary">Or try the demo — no signup →</a>
 </section>
 
 <div class="sources" aria-label="Sources">
