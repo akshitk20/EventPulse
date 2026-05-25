@@ -20,6 +20,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     new AntPathRequestMatcher("/"),
+                    new AntPathRequestMatcher("/demo"),
                     new AntPathRequestMatcher("/login"),
                     new AntPathRequestMatcher("/error"),
                     new AntPathRequestMatcher("/css/**"),

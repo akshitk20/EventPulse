@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Demo · EventPulse</title>
+    <meta name="description" content="A live read-only preview of the EventPulse feed. Real items, real ranking — no signup required."/>
+    <style>
+        :root {
+            --bg: #fbfaf7;
+            --surface: #ffffff;
+            --text: #1a1a1a;
+            --muted: #6b6b6b;
+            --border: #e5e1da;
+            --border-strong: #d6d1c7;
+            --accent: #1d4ed8;
+            --accent-hover: #1e40af;
+            --serif: 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+            --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrap { max-width: 720px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+
+        .topbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: .75rem 0 1.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.25rem;
+        }
+        .wordmark {
+            font-family: var(--serif);
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .wordmark:hover { color: var(--accent); }
+        .signin-cta {
+            font-size: .88rem;
+            color: white;
+            background: var(--accent);
+            padding: .4rem 1rem;
+            border-radius: 999px;
+            text-decoration: none;
+            transition: background .12s;
+        }
+        .signin-cta:hover { background: var(--accent-hover); color: white; }
+
+        .demo-banner {
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            display: flex; gap: 1rem; align-items: center; justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .demo-banner .text { flex: 1; min-width: 220px; }
+        .demo-banner strong {
+            font-family: var(--serif);
+            font-size: 1.05rem;
+            display: block;
+            margin-bottom: .15rem;
+        }
+        .demo-banner span { color: var(--muted); font-size: .9rem; }
+
+        .page-title {
+            font-family: var(--serif);
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin: 0 0 1.25rem;
+            letter-spacing: -0.01em;
+        }
+
+        .item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.1rem 1.25rem;
+            margin-bottom: .85rem;
+            transition: border-color .12s, box-shadow .12s;
+        }
+        .item:hover { border-color: var(--border-strong); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+        .item h2 {
+            font-family: var(--serif);
+            margin: 0 0 .35rem;
+            font-size: 1.15rem;
+            font-weight: 600;
+            line-height: 1.35;
+            letter-spacing: -0.005em;
+        }
+        .item h2 a { color: var(--text); text-decoration: none; }
+        .item h2 a:hover { color: var(--accent); }
+
+        .meta {
+            color: var(--muted);
+            font-size: .82rem;
+            display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+        }
+        .meta .dot { color: #c0bcb3; }
+
+        .source-pill {
+            display: inline-block;
+            padding: .1rem .55rem;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            color: white;
+            background: #888;
+        }
+        .source-pill.hn { background: #ff6600; }
+        .source-pill.reddit { background: #ff4500; }
+        .source-pill.sportsdb { background: #2e8b57; }
+        .source-pill.youtube { background: #ff0000; }
+
+        .interest-tag {
+            display: inline-block;
+            padding: .08rem .45rem;
+            border-radius: 4px;
+            background: #f1ede5;
+            color: #5a554a;
+            font-size: .72rem;
+        }
+
+        .actions {
+            margin-top: .85rem;
+            display: flex; gap: .4rem; align-items: center;
+        }
+        .actions a.button {
+            font-family: inherit;
+            font-size: .82rem;
+            padding: .3rem .75rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            text-decoration: none;
+            transition: background .12s, border-color .12s;
+        }
+        .actions a.button:hover {
+            background: #f5f2ec; border-color: var(--border-strong);
+        }
+        .actions .locked {
+            font-size: .82rem;
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        .pager {
+            display: flex; justify-content: space-between; gap: 1rem;
+            margin-top: 1.5rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .pager a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: .9rem;
+        }
+        .pager a:hover { color: var(--accent); }
+        .pager .spacer { flex: 1; }
+
+        .empty {
+            color: var(--muted);
+            font-style: italic;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .convert {
+            margin-top: 2.5rem;
+            padding: 2rem 1.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            text-align: center;
+        }
+        .convert h3 {
+            font-family: var(--serif);
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 0 0 .5rem;
+            letter-spacing: -0.01em;
+        }
+        .convert p {
+            color: var(--muted);
+            margin: 0 0 1.25rem;
+            font-size: .95rem;
+        }
+        .convert .cta {
+            display: inline-flex; align-items: center; gap: .5rem;
+            padding: .75rem 1.5rem;
+            border-radius: 999px;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background .12s;
+        }
+        .convert .cta:hover { background: var(--accent-hover); color: white; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header class="topbar">
+        <a href="/" class="wordmark">EventPulse</a>
+        <a href="/oauth2/authorization/google" class="signin-cta">Sign in with Google</a>
+    </header>
+
+    <div class="demo-banner">
+        <div class="text">
+            <strong>You're viewing the demo</strong>
+            <span>Live items from HN, Reddit, sports, and YouTube — ranked by trending. Sign in to make it yours.</span>
+        </div>
+    </div>
+
+    <h2 class="page-title">Sample feed</h2>
+
+    <p th:if="${#lists.isEmpty(items)}" class="empty">
+        Feed is warming up — the next polling cycle will populate it.
+    </p>
+
+    <article th:each="item : ${items}" class="item">
+        <h2>
+            <a th:href="${item.url}" target="_blank" rel="noopener noreferrer"
+               th:text="${item.title}">title</a>
+        </h2>
+        <div class="meta">
+            <span class="source-pill"
+                  th:classappend="${item.source}"
+                  th:text="${item.source}">source</span>
+            <span th:if="${item.publishedAt}" class="dot">&middot;</span>
+            <time th:if="${item.publishedAt}"
+                  th:datetime="${item.publishedAt}"
+                  th:text="${#temporals.format(item.publishedAt, 'yyyy-MM-dd HH:mm')}">date</time>
+            <th:block th:if="${not #sets.isEmpty(item.interests)}">
+                <span class="dot">&middot;</span>
+                <span th:each="i : ${item.interests}" class="interest-tag" th:text="${i.slug}">slug</span>
+            </th:block>
+        </div>
+        <div class="actions">
+            <a class="button" th:href="${item.url}" target="_blank" rel="noopener noreferrer">Open original &rarr;</a>
+            <span class="locked">Sign in to save</span>
+        </div>
+    </article>
+
+    <nav class="pager" th:if="${page > 0 or hasNext}">
+        <a th:if="${page > 0}" th:href="@{/demo(page=${page - 1})}">&larr; Newer</a>
+        <span th:unless="${page > 0}"></span>
+        <span class="spacer"></span>
+        <a th:if="${hasNext}" th:href="@{/demo(page=${page + 1})}">Older &rarr;</a>
+    </nav>
+
+    <section class="convert">
+        <h3>Like what you see?</h3>
+        <p>Sign in and the feed starts learning from your saves, clicks, and hides — across all four sources.</p>
+        <a href="/oauth2/authorization/google" class="cta">
+            Continue with Google
+            <span aria-hidden="true">&rarr;</span>
+        </a>
+    </section>
+</div>
+</body>
+</html>
